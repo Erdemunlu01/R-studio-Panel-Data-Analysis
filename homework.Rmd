@@ -1,0 +1,380 @@
+---
+title: "çalışma"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r}
+#gdppercapita log al df yap ve ana veriye sütun olarak ekle, bunu na çıkarılmış seride yap
+#gdp per capita nın yoğunluk fonksiyonunu araştır
+#binary grafik çizdir
+#manova dene yıılları bölmek için bir algoritma düşün
+library(dplyr)
+library(mice) 
+library(ade4) 
+library(car) 
+library(tidyverse)
+library(inferr)
+library(plotly)
+library(carrot)
+library(cowplot)
+library(plm)
+library(readxl)
+library(sandwich)
+library(ggplot2)
+
+
+
+df <- gdp_dem
+df$gdppercapitaconstant2000us <- log(df$gdppercapitaconstant2000us)
+summary(df)
+glimpse(df)
+df <- ts(df, 
+         start = 1960,
+         frequency = 1)
+dfp <- pdata.frame(df, index = c("country_name", "year"))
+dfp
+
+
+ggplot(dfp, aes(dem, gdppercapitaconstant2000us )) +
+  geom_point(size = 6, alpha = 0.6) 
+  
+
+ggplot(dfp, aes(gdppercapitaconstant2000us, dem )) +
+  geom_point(alpha = 0.6) 
+
+
+plot(dem ~ gdppercapitaconstant2000us, data = dfp,
+     pch = 20, cex = 1.5, main = "gdp/dem")
+
+
+glimpse(dfp)
+class(dfp)
+summarise(dfp)
+dfp
+
+
+df_gdpdem <- data.frame( dem = c(df$dem),
+                         gdppercapita = c(df$gdppercapitaconstant2000us)
+                         )
+
+#temel grafikler
+
+dfheat <- as.matrix(df_gdpdem)
+
+heatmap(dfheat)
+
+plot(dem ~gdppercapitaconstant2000us , data = dfp,
+     pch = 20, cex = 1.5, main = "table1")
+
+
+ggplot(data = dfp, mapping = aes(x = dfp$dem , y = dfp$gdppercapitaconstant2000us , col = "red" , cex = 1.5 )) + geom_line()
+
+ggplot(data = dfp, mapping = aes(x = dfp$country_name , y = dfp$gdppercapitaconstant2000us , col = "red"  )) + geom_line()
+
+ggplot(data = dfp, mapping = aes(x = dfp$country_name , y = dfp$dem , col = "red"  )) + geom_line()
+
+
+ggplot(data = dfp, mapping = aes(x = year)) +
+  geom_line(aes(y = gdppercapitaconstant2000us), col = "red") +
+  geom_line(aes(y = dem), col = "blue")
+
+
+ggplot(data = df , aes(x = country_name, y = gdppercapitaconstant2000us)) + geom_point()
+ 
+dfp_bar <- data.frame( dem = c(dfp$dem),
+                       gdppercapita = c(dfp$gdppercapitaconstant2000us))
+dfp_bar1 <- data.frame(country = c(dfp$country_name),
+                       gdppercapita = c(dfp$gdppercapitaconstant2000us))
+dfp_bar2 <- data.frame(dem = c(dfp$dem),
+                       country = c(dfp$country_name))
+dfp_bar3 <- data.frame(dem = c(dfp$dem),
+                       year = c(dfp$year))
+dfp_bar4 <- data.frame(gdppercapita = c(dfp$gdppercapitaconstant2000us),
+                       year = c(dfp$year))
+
+barplot(dfp_bar$gdppercapita, xlab = "dem", ylab = "logGDP", names.arg = dfp_bar$dem ,col= "red",border = "Black", main = "dem/gdp")
+
+barplot(dfp_bar$gdppercapita[1:50], xlab = "dem", ylab = "logGDP", names.arg = dfp_bar$dem[1:50] ,col= "red",border = "Black", main = "dem/gdp Argentina")
+
+barplot(dfp_bar$gdppercapita[51:101], xlab = "dem", ylab = "logGDP", names.arg = dfp_bar$dem[51:101] ,col= "red",border = "Black", main = "dem/gdp australia")
+
+barplot(dfp_bar1$gdppercapita, xlab = "country codes", ylab = "logGDP", names.arg = dfp_bar1$country ,col= "red",border = "green", main = "country/gdp")
+
+barplot(dfp_bar2$dem, xlab = "country codes", ylab = "dem", names.arg = dfp_bar2$country ,col= "red",border = "gray", main = "country/gdp")
+
+barplot(dfp_bar3$dem, xlab = "year", ylab = "dem", names.arg = dfp_bar3$year ,col= "red",border = "blue", main = "year/dem")
+
+barplot(dfp_bar4$gdp, xlab = "year", ylab = "logGDP", names.arg = dfp_bar4$year ,col= "red",border = "black", main = "year/gdp")
+
+plot(dfp_bar$gdppercapita,col="red",xlab = "", ylab = "logGDP", main = "GDP", type = "o", lwd="3")
+plot(dfp_bar$gdppercapita[1:50],col="red",xlab = "", ylab = "logGDP", main = "GDP/Argentina", type = "o", lwd="3")
+
+#panel data model
+pmodel <- plm(dem ~ gdppercapitaconstant2000us , data = dfp)
+summary(pmodel)
+plot(pmodel, data = dfp,
+     pch = 20, cex = 1.5, main = "table1")
+plmtest(pmodel)
+pbgtest(pmodel) #seriler arası kolerasyon testi; H0:seriler arası kolerasyon vardır
+pcdtest(pmodel, test = "cd") #yatay kesit bağımlılığı testi 
+
+summary(pmodel, vcov = vcovSCC)
+
+#anova oluyor
+res.aov <- aov( dem ~ gdppercapitaconstant2000us, data = dfp)
+res.aov
+res.aov[[1]]
+summary(res.aov)
+
+#one sample t test 
+# H0 : M >= 12
+# H1 : M < 12
+summary(dfp$gdppercapitaconstant2000us)
+a <- t.test(dfp$gdppercapitaconstant2000us, mu = 12 , alternative = "less" , conf.level = 0.95)
+a
+a[[1]]
+a[[2]]
+a[[3]]
+hist(dfp$gdppercapitaconstant2000us, breaks=10, col="red", xlab="Miles Per Gallon",
+   main="Histogram with Normal Curve")
+
+# Yatay kesit bağı
+# H0 yatay kesit bağı yoktur
+# H1 yatay kesit bağı vardır
+names(dfp)
+p_model <- plm(formula = gdppercapitaconstant2000us ~ 1, 
+               data = dfp, 
+               model = "pooling")
+summary(p_model) # H0 red
+pcdtest(p_model) # modeli verir
+pcdtest(p_model)[[1]] # test istatistiğini verir
+pcdtest(p_model)[[5]] # p değerini verir
+
+p_model1 <- plm(formula = as.formula(paste0(colnames(dfp)[3], "~1", sep = "")),
+                data = dfp,
+                model = "pooling")
+summary(p_model1)
+pcdtest(p_model1) # modeli verir
+pcdtest(p_model1)[[1]] # test istatistiğini verir
+pcdtest(p_model1)[[5]] # p değerini verir
+
+p_model2 <- plm(formula = as.formula(paste0(colnames(dfp)[6], "~1", sep = "")),
+                data = dfp,
+                model = "pooling")
+summary(p_model2)
+pcdtest(p_model2) # modeli verir
+pcdtest(p_model2)[[1]] # test istatistiğini verir
+pcdtest(p_model2)[[5]] # p değerini verir
+
+
+#tablo oluşturmak için alttakiler
+
+cd_test <- matrix(NA, nrow = 4, ncol = 2)
+colnames(cd_test) <- c("test statistics", "p-value")
+l_plm_models <- list()
+
+#for (i in 3 : (ncol(dfp))) {
+#  l_plm_models[[i]] <- plm(formula = as.formula(paste0(colnames(dfp)[i+2], "~1", sep = "")),
+  #              data = dfp,
+ #               model = "pooling")
+#  cd_test[c(i:i), c(1,2)] <- c((pcdtest(l_plm_models[[i]])[[1]]),
+   #                            (pcdtest(l_plm_models[[i]])[[5]]))
+#}
+
+gdp = ggplot(gdp_dem, aes(x = gdppercapitaconstant2000us))
+gdp+geom_density()
+
+
+```
+
+```{r}
+
+data.frame(a)
+ncol(dfp)
+nrow(dfp)
+dfp$dem 
+dfp$dem[[1]]
+dfp[1,]
+a <-  data.frame(a)
+a
+b <- data.frame(b)
+b
+
+#veri bölme algoritması
+
+for (i in 2 : (nrow(dfp))) {
+  
+  if (dfp$dem[[i]] == 1){
+    
+  a[i,] <- dfp[i,]
+  }
+    else{
+  b[i,] <- dfp[i,]  
+  }
+  
+}
+
+dfp_dem <- na.omit(a)
+dfp_nondem <- na.omit(b)
+nrow(dfp_dem)
+nrow(dfp_nondem)
+
+# dem
+ggplot(data = dfp_dem, mapping = aes(x = year , y = dfp_dem$gdppercapitaconstant2000us , col = "red"  )) + geom_line()
+
+ggplot(data = dfp_dem, mapping = aes(x = dfp_dem$country_name , y = dfp_dem$gdppercapitaconstant2000us , col = "red"  )) + geom_line()
+
+ggplot(data = dfp_dem, mapping = aes(x = year)) +
+  geom_line(aes(y = gdppercapitaconstant2000us), col = "red") +
+  geom_line(aes(y = dem), col = "blue")
+
+ggplot(data = dfp_dem , aes(x = country_name, y = gdppercapitaconstant2000us)) + geom_point()
+
+gdp = ggplot(dfp_dem, aes(x = gdppercapitaconstant2000us))
+gdp+geom_density()
+
+dfp_bar5 <- data.frame( dem = c(dfp_dem$dem),
+                       gdppercapita = c(dfp_dem$gdppercapitaconstant2000us))
+dfp_bar6 <- data.frame(country = c(dfp_dem$country_name),
+                       gdppercapita = c(dfp_dem$gdppercapitaconstant2000us))
+dfp_bar7 <- data.frame(gdppercapita = c(dfp_dem$gdppercapitaconstant2000us),
+                       year = c(dfp_dem$year))
+
+barplot(dfp_bar5$gdppercapita, xlab = "dem", ylab = "logGDP", names.arg = dfp_bar5$dem ,col= "red",border = "blue", main = "dem/gdp")
+
+barplot(dfp_bar6$gdppercapita, xlab = "country codes", ylab = "logGDP", names.arg = dfp_bar6$country ,col= "red",border = "green", main = "country/gdp")
+
+barplot(dfp_bar7$gdp, xlab = "year", ylab = "logGDP", names.arg = dfp_bar7$year ,col= "red",border = "black", main = "year/gdp")
+
+plot(dfp_bar5$gdppercapita,col="red",xlab = "", ylab = "logGDP", main = "GDP", type = "o", lwd="3")
+
+
+#one sample t test 
+# H0 : M >= 12
+# H1 : M < 12
+summary(dfp_dem$gdppercapitaconstant2000us)
+t.test(dfp_dem$gdppercapitaconstant2000us, mu = 12 , alternative = "less" , conf.level = 0.95)
+
+hist(dfp_dem$gdppercapitaconstant2000us, breaks=10, col="red", xlab="gdp",
+   main="Histogram with Normal Curve")
+
+
+# nondem
+
+ggplot(data = dfp_nondem, mapping = aes(x = year , y = dfp_nondem$gdppercapitaconstant2000us , col = "red"  )) + geom_line()
+
+ggplot(data = dfp_nondem, mapping = aes(x = dfp_nondem$country_name , y = dfp_nondem$gdppercapitaconstant2000us , col = "red"  )) + geom_line()
+
+ggplot(data = dfp_nondem, mapping = aes(x = year)) +
+  geom_line(aes(y = gdppercapitaconstant2000us), col = "red") +
+  geom_line(aes(y = dem), col = "blue")
+
+ggplot(data = dfp_nondem , aes(x = country_name, y = gdppercapitaconstant2000us)) + geom_point()
+ 
+gdp = ggplot(dfp_nondem, aes(x = gdppercapitaconstant2000us))
+gdp+geom_density()
+
+dfp_bar8 <- data.frame( dem = c(dfp_nondem$dem),
+                       gdppercapita = c(dfp_nondem$gdppercapitaconstant2000us))
+dfp_bar9 <- data.frame(country = c(dfp_nondem$country_name),
+                       gdppercapita = c(dfp_nondem$gdppercapitaconstant2000us))
+dfp_bar10 <- data.frame(gdppercapita = c(dfp_nondem$gdppercapitaconstant2000us),
+                       year = c(dfp_nondem$year))
+
+barplot(dfp_bar8$gdppercapita, xlab = "dem", ylab = "logGDP", names.arg = dfp_bar8$dem ,col= "red",border = "Black", main = "dem/gdp")
+
+barplot(dfp_bar9$gdppercapita, xlab = "country codes", ylab = "logGDP", names.arg = dfp_bar9$country ,col= "red",border = "green", main = "country/gdp")
+
+barplot(dfp_bar10$gdp, xlab = "year", ylab = "logGDP", names.arg = dfp_bar10$year ,col= "red",border = "black", main = "year/gdp")
+
+plot(dfp_bar8$gdppercapita,col="Blue",xlab = "", ylab = "logGDP", main = "GDP", type = "o", lwd="3")
+
+#one sample t test 
+# H0 : M >= 12
+# H1 : M < 12
+summary(dfp$gdppercapitaconstant2000us)
+t.test(dfp$gdppercapitaconstant2000us, mu = 12 , alternative = "less" , conf.level = 0.95)
+
+hist(dfp$gdppercapitaconstant2000us, breaks=10, col="red", xlab="gdp",
+   main="Histogram with Normal Curve")
+
+
+plot(dfp_nondem$gdppercapitaconstant2000us[1:50],col="blue",xlab = "DEM/NONDEM", ylab = "logGDP", main = "GDP/DEM/NONDEM", type = "o",lwd="2")
+lines(dfp_dem$gdppercapitaconstant2000us[1:50],type = "o", col="red",lwd="2")
+
+```
+
+```{r}
+Table1 <- c("gdppercapitaconstant2000us", "dem")
+
+means_nondemocracy <- round(apply(dfp[which(dfp$dem==0),Table1], na.rm=T,2,mean),digits=2)
+sd_nondemocracy <- round(apply(dfp[which(dfp$dem==0),Table1], na.rm=T,2,sd),digits=2)
+means_democracy <- round(apply(dfp[which(dfp$dem==1),Table1], na.rm=T,2,mean),digits=2)
+sd_democracy <- round(apply(dfp[which(dfp$dem==1),Table1], na.rm=T,2,sd),digits=2)
+obs_non <- nrow(dfp[which(dfp$dem==0),])
+obs_dem <- nrow(dfp[which(dfp$dem==1),])
+
+Table1 <- cbind( obs_non, means_nondemocracy, sd_nondemocracy,obs_dem, means_democracy, sd_democracy)
+Table1
+
+colnames(Table1) <- c("Observations", "Means (Nondemocracy)", "Standart Deviation (Nondemocracy)", "Observations", "Means (Democracy)", "Standart Deviation (Democracy)")
+
+
+print(xtable(Table1, caption="Descriptives Statistics"), type="html", file="DS.html", caption.placement="top")
+
+
+
+
+```
+
+
+```{r}
+Table2 <- c("gdppercapitaconstant2000us", "dem")
+
+coefficents <- res.aov[[1]]
+a <- summary(res.aov)[[1]]
+a
+Table2 <- cbind(a, coefficents )
+Table2
+
+colnames(Table2) <- c("DF" , "Sum Of Square", "Mean Of Square" , "F Value" , "P value" , "Coefficents")
+
+
+print(xtable(Table2, caption="Analisys Of Variance"), type="html", file="Anova.html", caption.placement="top")
+
+
+```
+
+
+```{r}
+table3 <- c("gdppercapitaconstant2000us")
+
+coefficents1 <- summary(p_model)[[2]]
+general <- summary(p_model)[[1]]
+obs <- summary(p_model)[[4]]
+r_sqr <- summary(p_model)[[11]]
+pcdtest(p_model)
+
+Table3 <- cbind( coefficents1, general, obs, r_sqr )
+Table3
+#coefficents1, general, obs, model, p_value, r_sqr
+colnames(Table3) <- c("Intercept" , "Estimate", "Standart Error" , "t-Value" , "P-value" , "obs", "R-squared")
+
+
+print(xtable(Table3, caption="Horizontal Section Bond Analysis"), type="html", file="Horizen.html", caption.placement="top")
+
+
+
+#1 genel model 2 intercept 4 obs 5 mnodel 7 pvalue R-squares
+
+
+
+
+
+
+```
+
+
